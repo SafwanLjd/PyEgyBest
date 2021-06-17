@@ -6,14 +6,15 @@ import requests
 import re
 
 
-def search(query, includeShows=True, includeMovies=True):
+def search(query, includeShows=True, includeMovies=True, timeout=60):
 	resultsList = []
 	try:
-		content = requests.get(f'https://egy.best/explore/?q={query}\u0020', allow_redirects=True).text
+		content = requests.get(f'https://egy.best/explore/?q={query}\u0020', allow_redirects=True, timeout=timeout).text
 		soup = BeautifulSoup(content, features='html.parser')
 
 		if soup.body is not None:
-			searchResults = soup.body.find('div', attrs={'id': 'movies', 'class': 'movies'}).findAll('a')
+			temp = soup.body.find('div', attrs={'id': 'movies', 'class': 'movies'})
+			searchResults = temp.findAll('a') if temp else None
 
 			for result in searchResults:
 				isButton = ' '.join(result.get('class')) == "auto load btn b"
@@ -54,7 +55,8 @@ class Show:
 			soup = BeautifulSoup(series, features='html.parser')
 
 			if soup.body is not None:
-				seasons = soup.body.find('div', attrs={'class': 'contents movies_small'}).findAll('a')
+				temp = soup.body.find('div', attrs={'class': 'contents movies_small'})
+				seasons = temp.findAll('a') if temp else None
 
 				for season in seasons:
 					seasonLink = BeautifulSoup(str(season), features='html.parser').a.get('href')
@@ -81,7 +83,8 @@ class Season:
 			soup = BeautifulSoup(season, features='html.parser')
 
 			if soup.body is not None:
-				episodes = soup.body.find('div', attrs={'class': 'movies_small'}).findAll('a')
+				temp = soup.body.find('div', attrs={'class': 'movies_small'})
+				episodes = temp.findAll('a') if temp else None
 
 				for episode in episodes:
 					episodeLink = BeautifulSoup(str(episode), features='html.parser').a.get('href')
