@@ -8,7 +8,7 @@ except IOError:
 
 setup(
 	name='egybest',
-	version='1.2.2',
+	version='1.2.3',
 	packages=['egybest'],
 	author='Safwan Ljd',
 	license_files=('LICENSE',),
@@ -16,7 +16,7 @@ setup(
 	long_description=long_description,
 	long_description_content_type='text/markdown',
 	url='https://github.com/SafwanLjd/PyEgyBest',
-	download_url='https://github.com/SafwanLjd/PyEgyBest/archive/refs/tags/v1.2.2.tar.gz',
+	download_url='https://github.com/SafwanLjd/PyEgyBest/archive/refs/tags/v1.2.3.tar.gz',
 	install_requires=['js2py', 'bs4', 'requests', 'strsimpy'],
 	classifiers=[
 		'Development Status :: 5 - Production/Stable',

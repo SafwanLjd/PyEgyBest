@@ -34,7 +34,8 @@ def search(query, includeShows=True, includeMovies=True, timeout=60):
 						resultsList.append(Episode(link, title, posterURL, rating))
 
 			resultsList.sort(key=lambda element: Levenshtein().distance(query, element.title))
-
+	except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+		return search(query, includeMovies=includeMovies, includeShows=includeShows, timeout=(timeout + 1))
 	except Exception as excepttion:
 		print(excepttion)
 
