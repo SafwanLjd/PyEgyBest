@@ -8,7 +8,7 @@ except IOError:
 
 setup(
 	name='egybest',
-	version='1.2.1',
+	version='1.2.2',
 	packages=['egybest'],
 	author='Safwan Ljd',
 	license_files=('LICENSE',),
