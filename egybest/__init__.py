@@ -19,9 +19,11 @@ def search(query, includeShows=True, includeMovies=True, timeout=60):
 			for result in searchResults:
 				isButton = ' '.join(result.get('class')) == "auto load btn b"
 				if not isButton:
-					link = BeautifulSoup(str(result), features='html.parser').a.get('href')
+					temp = BeautifulSoup(str(result), features='html.parser').a
+					link = temp.get('href') if temp else None
 					title = result.find('span', attrs={'class': 'title'}).text
-					posterURL = result.find('img').get('src')
+					temp = result.find('img')
+					posterURL = temp.get('src') if temp else None
 
 					try:
 						rating = result.find('i', attrs={'class': 'i-fav rating'}).text
