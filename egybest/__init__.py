@@ -6,40 +6,42 @@ import requests
 import re
 
 
-def search(query, includeShows=True, includeMovies=True, timeout=60):
+def search(query, includeShows=True, includeMovies=True, timeout=60, retries=1):
 	resultsList = []
-	try:
-		content = requests.get(f'https://egy.best/explore/?q={query}\u0020', allow_redirects=True, timeout=timeout).text
-		soup = BeautifulSoup(content, features='html.parser')
+	
+	if retries > 0:
+		try:
+			content = requests.get(f'https://egy.best/explore/?q={query}\u0020', allow_redirects=True, timeout=timeout).text
+			soup = BeautifulSoup(content, features='html.parser')
 
-		if soup.body is not None:
-			temp = soup.body.find('div', attrs={'id': 'movies', 'class': 'movies'})
-			searchResults = temp.findAll('a') if temp else None
+			if soup.body is not None:
+				temp = soup.body.find('div', attrs={'id': 'movies', 'class': 'movies'})
+				searchResults = temp.findAll('a') if temp else None
 
-			for result in searchResults:
-				isButton = ' '.join(result.get('class')) == "auto load btn b"
-				if not isButton:
-					temp = BeautifulSoup(str(result), features='html.parser').a
-					link = temp.get('href') if temp else None
-					title = result.find('span', attrs={'class': 'title'}).text
-					temp = result.find('img')
-					posterURL = temp.get('src') if temp else None
+				for result in searchResults:
+					isButton = ' '.join(result.get('class')) == "auto load btn b"
+					if not isButton:
+						temp = BeautifulSoup(str(result), features='html.parser').a
+						link = temp.get('href') if temp else None
+						title = result.find('span', attrs={'class': 'title'}).text
+						temp = result.find('img')
+						posterURL = temp.get('src') if temp else None
 
-					try:
-						rating = result.find('i', attrs={'class': 'i-fav rating'}).text
-					except Exception as exception:
-						rating = None
+						try:
+							rating = result.find('i', attrs={'class': 'i-fav rating'}).text
+						except Exception as exception:
+							rating = None
 
-					if link.split('/')[3] == 'series' and includeShows:
-						resultsList.append(Show(link, title, posterURL, rating))
-					elif link.split('/')[3] == 'movie' and includeMovies:
-						resultsList.append(Episode(link, title, posterURL, rating))
+						if link.split('/')[3] == 'series' and includeShows:
+							resultsList.append(Show(link, title, posterURL, rating))
+						elif link.split('/')[3] == 'movie' and includeMovies:
+							resultsList.append(Episode(link, title, posterURL, rating))
 
-			resultsList.sort(key=lambda element: Levenshtein().distance(query, element.title))
-	except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-		return search(query, includeMovies=includeMovies, includeShows=includeShows, timeout=(timeout + 1))
-	except Exception as excepttion:
-		print(excepttion)
+				resultsList.sort(key=lambda element: Levenshtein().distance(query, element.title))
+		except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+			return search(query, includeMovies=includeMovies, includeShows=includeShows, timeout=(timeout + 1), retries=(retries - 1))
+		except Exception as excepttion:
+			print(excepttion)
 
 	return resultsList
 
