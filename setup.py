@@ -1,6 +1,8 @@
 from setuptools import setup
 
 description = 'A Selenium-less Python EgyBest Library'
+__version__ = '1.2.5'
+
 try:
 	long_description = open('README.md', 'r').read()
 except IOError:
@@ -8,7 +10,7 @@ except IOError:
 
 setup(
 	name='egybest',
-	version='1.2.4',
+	version=__version__,
 	packages=['egybest'],
 	author='Safwan Ljd',
 	license_files=('LICENSE',),
@@ -16,7 +18,7 @@ setup(
 	long_description=long_description,
 	long_description_content_type='text/markdown',
 	url='https://github.com/SafwanLjd/PyEgyBest',
-	download_url='https://github.com/SafwanLjd/PyEgyBest/archive/refs/tags/v1.2.4.tar.gz',
+	download_url=f'https://github.com/SafwanLjd/PyEgyBest/archive/refs/tags/v{__version__}.tar.gz',
 	install_requires=['js2py', 'bs4', 'requests', 'strsimpy'],
 	classifiers=[
 		'Development Status :: 5 - Production/Stable',
