@@ -15,22 +15,19 @@ def search(query, includeShows=True, includeMovies=True, timeout=60, retries=1):
 			soup = BeautifulSoup(content, features='html.parser')
 
 			if soup.body is not None:
-				temp = soup.body.find('div', attrs={'id': 'movies', 'class': 'movies'})
-				searchResults = temp.findAll('a') if temp else None
+				mvoiesClass = soup.body.find('div', attrs={'id': 'movies', 'class': 'movies'})
+				searchResults = mvoiesClass.findAll('a') if mvoiesClass else []
 
 				for result in searchResults:
 					isButton = ' '.join(result.get('class')) == "auto load btn b"
 					if not isButton:
-						temp = BeautifulSoup(str(result), features='html.parser').a
-						link = temp.get('href') if temp else None
+						link = BeautifulSoup(str(result), features='html.parser').a.get('href')
 						title = result.find('span', attrs={'class': 'title'}).text
-						temp = result.find('img')
-						posterURL = temp.get('src') if temp else None
+						imgTag = result.find('img')
+						posterURL = imgTag.get('src') if imgTag else None
+						ratingClass = result.find('i', attrs={'class': 'i-fav rating'})
+						rating = ratingClass.text if ratingClass else None
 
-						try:
-							rating = result.find('i', attrs={'class': 'i-fav rating'}).text
-						except Exception as exception:
-							rating = None
 
 						if link.split('/')[3] == 'series' and includeShows:
 							resultsList.append(Show(link, title, posterURL, rating))
@@ -60,11 +57,11 @@ class Show:
 			soup = BeautifulSoup(series, features='html.parser')
 
 			if soup.body is not None:
-				temp = soup.body.find('div', attrs={'class': 'contents movies_small'})
-				seasons = temp.findAll('a') if temp else None
+				contentsClass = soup.body.find('div', attrs={'class': 'contents movies_small'})
+				seasons = contentsClass.findAll('a') if contentsClass else []
 
 				for season in seasons:
-					seasonLink = BeautifulSoup(str(season), features='html.parser').a.get('href')
+					seasonLink = season.get('href')
 					seasonTitle = season.find('span', attrs={'class': 'title'}).text
 					seasonPosterURL = season.find('img').get('src')
 
@@ -88,18 +85,16 @@ class Season:
 			soup = BeautifulSoup(season, features='html.parser')
 
 			if soup.body is not None:
-				temp = soup.body.find('div', attrs={'class': 'movies_small'})
-				episodes = temp.findAll('a') if temp else None
+				moviesClass = soup.body.find('div', attrs={'class': 'movies_small'})
+				episodes = moviesClass.findAll('a') if moviesClass else []
 
 				for episode in episodes:
-					episodeLink = BeautifulSoup(str(episode), features='html.parser').a.get('href')
+					episodeLink = episode.get('href')
 					episodeTitle = episode.find('span', attrs={'class': 'title'}).text
-					episodePosterURL = episode.find('img').get('src')
-					
-					try:
-						episodeRating = episode.find('i', attrs={'class': 'i-fav rating'}).text
-					except Exception as exception:
-						episodeRating = None
+					imgTag = episode.find('img')
+					episodePosterURL = imgTag.get('src') if imgTag else None
+					ratingClass = episode.find('i', attrs={'class': 'i-fav rating'})
+					episodeRating = ratingClass.text if ratingClass else None
 
 					self.episodesList.insert(0, Episode(episodeLink, episodeTitle, episodePosterURL, episodeRating))
 					
