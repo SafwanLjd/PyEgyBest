@@ -1,7 +1,7 @@
 from setuptools import setup
 
 description = 'A Selenium-less Python EgyBest Library'
-__version__ = '1.2.5'
+__version__ = '1.2.6'
 
 try:
 	long_description = open('README.md', 'r').read()
