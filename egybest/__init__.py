@@ -7,11 +7,12 @@ import re
 
 
 def search(query, includeShows=True, includeMovies=True, timeout=30, retries=1):
+	searchURL = f"https://egy.best/explore/?q={query}%20"
+	searchResponse = None
 	resultsList = []
-
+	
 	try:
 		if retries > 0:
-			searchURL = f"https://egy.best/explore/?q={query}%20"
 			searchResponse = requests.get(searchURL, timeout=timeout)
 			
 			content = searchResponse.text
