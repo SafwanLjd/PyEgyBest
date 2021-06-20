@@ -6,46 +6,48 @@ import requests
 import re
 
 
-def search(query, includeShows=True, includeMovies=True, timeout=60, retries=1):
+def search(query, includeShows=True, includeMovies=True, timeout=30, retries=1):
 	resultsList = []
-	
-	if retries > 0:
-		try:
-			# I added the %20 (space) because of a weird edge case when searching for "limitless"
-			searchURL = f"https://egy.best/explore/?q={query}%20"
 
-			content = requests.get(searchURL, allow_redirects=True, timeout=timeout).text
+	try:
+		if retries > 0:
+			searchURL = f"https://egy.best/explore/?q={query}%20"
+			searchResponse = requests.get(searchURL, timeout=timeout)
+			
+			content = searchResponse.text
 			soup = BeautifulSoup(content, features="html.parser")
 
-			if soup.body:
-				mvoiesClass = soup.body.find("div", attrs={"id": "movies", "class": "movies"})
-				searchResults = mvoiesClass.findAll("a")
+			mvoiesClass = soup.body.find(attrs={"id": "movies", "class": "movies"})
+			searchResults = mvoiesClass.findAll("a")
 
-				for result in searchResults:
-					if " ".join(result.get("class")) == "auto load btn b":
-						continue
+			for result in searchResults:
+				if " ".join(result.get("class")) == "auto load btn b":
+					continue
 
-					link = result.get("href")
-					titleClass = result.find("span", attrs={"class": "title"})
-					title = titleClass.text if titleClass else None
-					imgTag = result.find("img")
-					posterURL = imgTag.get("src") if imgTag else None
-					ratingClass = result.find("i", attrs={"class": "i-fav rating"})
-					rating = ratingClass.text if ratingClass else None
+				link = result.get("href")
+				
+				titleClass = result.find(attrs={"class": "title"})
+				title = titleClass.text if titleClass else None
 
+				imgTag = result.find("img")
+				posterURL = imgTag.get("src") if imgTag else None
+				
+				ratingClass = result.find(attrs={"class": "i-fav rating"})
+				rating = ratingClass.text if ratingClass else None
 
-					if link.split("/")[3] == "series" and includeShows:
-						resultsList.append(Show(link, title, posterURL, rating))
-					elif link.split("/")[3] == "movie" and includeMovies:
-						resultsList.append(Episode(link, title, posterURL, rating))
+				if link.split("/")[3] == "series" and includeShows:
+					resultsList.append(Show(link, title, posterURL, rating))
+				elif link.split("/")[3] == "movie" and includeMovies:
+					resultsList.append(Episode(link, title, posterURL, rating))
 
-				resultsList.sort(key=lambda element: Levenshtein().distance(query, element.title))
+			resultsList.sort(key=lambda element: Levenshtein().distance(query, element.title))
 
-		except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-			return search(query, includeMovies=includeMovies, includeShows=includeShows, timeout=(timeout + 1), retries=(retries - 1))
-		
-		finally:
-			return resultsList
+	except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+		print("Could Not Connect to Host: " + searchResponse.url.split("/")[2])
+		return search(query, includeMovies=includeMovies, includeShows=includeShows, timeout=(timeout + 1), retries=(retries - 1))
+	
+	finally:
+		return resultsList
 
 
 class Show:
@@ -55,25 +57,58 @@ class Show:
 		self.posterURL = posterURL
 		self.rating = rating
 		self.seasonsList = []
-	
+
+		soup = None
+		try:
+			showPage = requests.get(self.link).text
+			soup = BeautifulSoup(showPage, features="html.parser")
+
+		finally:
+			self.soup = soup
+
 	def getSeasons(self):
 		try:
-			series = requests.get(self.link).text
-			soup = BeautifulSoup(series, features="html.parser")
+			seasons = self.soup.body.find(attrs={"class": "contents movies_small"}).findAll("a")
+			for season in seasons:
+				seasonLink = season.get("href")
+				
+				titleClass = season.find(attrs={"class": "title"})
+				seasonTitle = titleClass.text if titleClass else None
+				
+				imgTag = season.find("img")
+				seasonPosterURL = imgTag.get("src") if imgTag else None
 
-			if soup.body:
-				seasons = soup.body.find("div", attrs={"class": "contents movies_small"}).findAll("a")
+				self.seasonsList.insert(0, Season(seasonLink, seasonTitle, seasonPosterURL))
 
-				for season in seasons:
-					seasonLink = season.get("href")
-					titleClass = season.find("span", attrs={"class": "title"})
-					seasonTitle = titleClass.text if titleClass else None
-					imgTag = season.find("img")
-					seasonPosterURL = imgTag.get("src") if imgTag else None
-
-					self.seasonsList.insert(0, Season(seasonLink, seasonTitle, seasonPosterURL))
 		finally:
 			return self.seasonsList
+
+	def refreshMetadata(self, posterOnly=False):
+		title = self.title
+		posterURL = self.posterURL
+		rating = self.rating
+
+		try:
+			if not posterOnly:
+				name = self.soup.body.find(attrs={"itemprop": "name"})
+				if name:
+					title = name.text
+
+				ratingValue = self.soup.body.find(attrs={"itemprop": "ratingValue"})
+				if ratingValue:
+					rating = ratingValue.text
+
+			imgClass = self.soup.body.find(attrs={"class": "movie_img"})
+			if imgClass:
+				imgTag = imgClass.find("img")
+				if imgTag:
+					posterURL = imgTag.get("src")
+
+		finally:
+			self.title = title
+			self.posterURL = posterURL
+			self.rating = rating
+
 
 class Season:
 	def __init__(self, link, title=None, posterURL=None):
@@ -81,28 +116,55 @@ class Season:
 		self.title = title
 		self.posterURL = posterURL
 		self.episodesList = []
-	
+
+		soup = None
+		try:
+			showPage = requests.get(self.link).text
+			soup = BeautifulSoup(showPage, features="html.parser")
+
+		finally:
+			self.soup = soup
+
 	def getEpisodes(self):
 		try:
-			season = requests.get(self.link).text
-			soup = BeautifulSoup(season, features="html.parser")
+			episodes  = self.soup.body.find(attrs={"class": "movies_small"}).findAll("a")
+			for episode in episodes:
+				episodeLink = episode.get("href")
+				
+				titleClass = episode.find(attrs={"class": "title"})
+				episodeTitle = titleClass.text if titleClass else None
+				
+				imgTag = episode.find("img")
+				episodePosterURL = imgTag.get("src") if imgTag else None
+				
+				ratingClass = episode.find(attrs={"class": "i-fav rating"})
+				episodeRating = ratingClass.text if ratingClass else None
 
-			if soup.body:
-				episodes  = soup.body.find("div", attrs={"class": "movies_small"}).findAll("a")
-
-				for episode in episodes:
-					episodeLink = episode.get("href")
-					titleClass = episode.find("span", attrs={"class": "title"})
-					episodeTitle = titleClass.text if titleClass else None
-					imgTag = episode.find("img")
-					episodePosterURL = imgTag.get("src") if imgTag else None
-					ratingClass = episode.find("i", attrs={"class": "i-fav rating"})
-					episodeRating = ratingClass.text if ratingClass else None
-
-					self.episodesList.insert(0, Episode(episodeLink, episodeTitle, episodePosterURL, episodeRating))
+				self.episodesList.insert(0, Episode(episodeLink, episodeTitle, episodePosterURL, episodeRating))
 					
 		finally:
 			return self.episodesList
+
+	def refreshMetadata(self, posterOnly=False):
+		title = self.title
+		posterURL = self.posterURL
+
+		try:
+			if not posterOnly:
+				name = self.soup.body.find(attrs={"itemprop": "name"})
+				if name:
+					title = name.text
+
+			imgClass = self.soup.body.find(attrs={"class": "movie_img"})
+			if imgClass:
+				imgTag = imgClass.find("img")
+				if imgTag:
+					posterURL = imgTag.get("src")
+
+		finally:
+			self.title = title
+			self.posterURL = posterURL
+
 
 class Episode:
 	def __init__(self, link, title=None, posterURL=None, rating=None):
@@ -112,14 +174,21 @@ class Episode:
 		self.rating = rating
 		self.downloadLinksList = []
 
+		soup = None
+		try:
+			showPage = requests.get(self.link).text
+			soup = BeautifulSoup(showPage, features="html.parser")
+
+		finally:
+			self.soup = soup
+
 	def getDownloadSources(self):
 		try:
 			session = requests.Session()
 
 			baseURL = self.link.split("/")[0] + "//" + self.link.split("/")[2]
 
-			episode = session.get(self.link).text
-			episodeSoup = BeautifulSoup(episode, features="html.parser")
+			episodeSoup = self.soup
 
 			vidstreamURL = baseURL + episodeSoup.body.find("iframe", attrs={"class": "auto-size"}).get("src")
 
@@ -128,6 +197,7 @@ class Episode:
 
 			try:
 				qualityLinksFileURL = baseURL + videoSoup.body.find("source").get("src")
+
 			except AttributeError:
 				jsCode = str(videoSoup.find_all("script")[1])
 
@@ -168,8 +238,29 @@ class Episode:
 				fileName = self.link.split("/")[4] + "-" + str(quality) + "p.mp4"
 
 				self.downloadLinksList.append(DownloadSource(link, quality, fileName))
+
 		finally:
 			return self.downloadLinksList
+
+	def refreshMetadata(self, posterOnly=False):
+		title = self.title
+		posterURL = self.posterURL
+
+		try:
+			if not posterOnly:
+				name = self.soup.body.find(attrs={"class": "movie_title"})
+				if name:
+					title = name.text
+
+			imgClass = self.soup.body.find(attrs={"class": "movie_img"})
+			if imgClass:
+				imgTag = imgClass.find("img")
+				if imgTag:
+					posterURL = imgTag.get("src")
+
+		finally:
+			self.title = title
+			self.posterURL = posterURL
 
 	def __roundQuality(self, originalQuality):
 		qualities = [2160, 1080, 720, 480, 360, 240]
@@ -181,7 +272,9 @@ class Episode:
 			if difference < lastDifference:
 				lastDifference = difference
 				roundedQuality = quality
+
 		return roundedQuality
+
 
 class DownloadSource:
 	def __init__(self, link, quality=None, fileName=None):
