@@ -3,23 +3,27 @@ from strsimpy.levenshtein import Levenshtein
 from js2py import eval_js as executeJS
 from bs4 import BeautifulSoup
 import requests
+import math
 import re
 
 
-def search(query, includeShows=True, includeMovies=True, timeout=30, retries=1):
-	searchURL = f"https://egy.best/explore/?q={query}%20"
-	searchResponse = None
-	resultsList = []
+class EgyBest:
+	def __init__(self, mirrorURL=None):
+		self.baseURL = mirrorURL if mirrorURL else "https://egy.best"
 	
-	try:
-		if retries > 0:
-			searchResponse = requests.get(searchURL, timeout=timeout)
+	def search(self, query, includeShows=True, includeMovies=True, originalOrder=False):
+		searchURL = f"{self.baseURL}/explore/?q={query}%20"
+		searchResponse = None
+		resultsList = []
+		
+		try:
+			searchResponse = requests.get(searchURL)
 			
-			content = searchResponse.text
-			soup = BeautifulSoup(content, features="html.parser")
+			pageContent = searchResponse.text
+			soup = BeautifulSoup(pageContent, features="html.parser")
 
-			mvoiesClass = soup.body.find(attrs={"id": "movies", "class": "movies"})
-			searchResults = mvoiesClass.findAll("a")
+			resultsClass = soup.body.find(attrs={"id": "movies", "class": "movies"})
+			searchResults = resultsClass.findAll("a")
 
 			for result in searchResults:
 				if " ".join(result.get("class")) == "auto load btn b":
@@ -40,15 +44,85 @@ def search(query, includeShows=True, includeMovies=True, timeout=30, retries=1):
 					resultsList.append(Show(link, title, posterURL, rating))
 				elif link.split("/")[3] == "movie" and includeMovies:
 					resultsList.append(Episode(link, title, posterURL, rating))
+			
+			if not originalOrder:
+				resultsList.sort(key=lambda element: Levenshtein().distance(query, element.title))
 
-			resultsList.sort(key=lambda element: Levenshtein().distance(query, element.title))
+		finally:
+			return resultsList
 
-	except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-		print("Could Not Connect to Host: " + searchResponse.url.split("/")[2])
-		return search(query, includeMovies=includeMovies, includeShows=includeShows, timeout=(timeout + 1), retries=(retries - 1))
-	
-	finally:
-		return resultsList
+	def getTopShows(self, n=50):
+		iterations = int(math.ceil(n / 12))
+		leftOver = n % 12
+		topShowsList = []
+
+		try:
+			for iteration in range(iterations):
+				topShows = __getTop(listType="tv", pageNum=(iteration + 1))
+				for i in range(len(topShows)):
+					if (iteration + 1) == iterations and i == leftOver:
+						break
+
+					topShowsList.append(topShows[i])
+
+		finally:
+			return topShowsList
+
+	def getTopMovies(self, n=50):
+		iterations = int(math.ceil(n / 12))
+		leftOver = n % 12
+		topMoviesList = []
+
+		try:
+			for iteration in range(iterations):
+				topMovies = __getTop(listType="movies", pageNum=(iteration + 1))
+				for i in range(len(topMovies)):
+					if (iteration + 1) == iterations and i == leftOver:
+						break
+
+					topMoviesList.append(topMovies[i])
+
+		finally:
+			return topMoviesList
+
+	def getTopShowsPage(self, pageNum):
+		return self.__getTop(listType="tv", pageNum=pageNum)
+
+	def getTopMoviesPage(self, pageNum):
+		return self.__getTop(listType="movies", pageNum=pageNum)
+
+	def __getTop(self, listType, pageNum):
+		topURL = f"{self.baseURL}/{listType}/top/?page={pageNum}"
+		topList = []
+
+		try:
+			topResponse = requests.get(topURL)
+
+			pageContent = topResponse.text
+			soup = BeautifulSoup(pageContent, "html.parser")
+
+			resultsClass = soup.body.find(attrs={"id": "movies"})
+			results = resultsClass.findAll("a")
+
+			for result in results:
+				if " ".join(result.get("class")) == "auto load btn b":
+					continue
+
+				link = result.get("href")
+
+				titleClass = result.find(attrs={"class": "title"})
+				title = titleClass.text if titleClass else None
+
+				imgTag = result.find("img")
+				posterURL = imgTag.get("src") if imgTag else None
+
+				ratingClass = result.find(attrs={"class": "i-fav rating"})
+				rating = ratingClass.text if ratingClass else None
+
+				topList.append(Episode(link, title, posterURL, rating) if listType == "movies" else Show(link, title, posterURL, rating))
+
+		finally:
+			return topList
 
 
 class Show:
@@ -57,18 +131,17 @@ class Show:
 		self.title = title
 		self.posterURL = posterURL
 		self.rating = rating
+
+		self.soup = None
+
 		self.seasonsList = []
-
-		soup = None
-		try:
-			showPage = requests.get(self.link).text
-			soup = BeautifulSoup(showPage, features="html.parser")
-
-		finally:
-			self.soup = soup
 
 	def getSeasons(self):
 		try:
+			if not self.soup:
+				showPage = requests.get(self.link).text
+				self.soup = BeautifulSoup(showPage, features="html.parser")
+
 			seasons = self.soup.body.find(attrs={"class": "contents movies_small"}).findAll("a")
 			for season in seasons:
 				seasonLink = season.get("href")
@@ -90,6 +163,10 @@ class Show:
 		rating = self.rating
 
 		try:
+			if not self.soup:
+				showPage = requests.get(self.link).text
+				self.soup = BeautifulSoup(showPage, features="html.parser")
+
 			if not posterOnly:
 				name = self.soup.body.find(attrs={"itemprop": "name"})
 				if name:
@@ -116,18 +193,17 @@ class Season:
 		self.link = link
 		self.title = title
 		self.posterURL = posterURL
+		
+		self.soup = None
+
 		self.episodesList = []
-
-		soup = None
-		try:
-			showPage = requests.get(self.link).text
-			soup = BeautifulSoup(showPage, features="html.parser")
-
-		finally:
-			self.soup = soup
 
 	def getEpisodes(self):
 		try:
+			if not self.soup:
+				seasonPage = requests.get(self.link).text
+				self.soup = BeautifulSoup(seasonPage, features="html.parser")
+
 			episodes  = self.soup.body.find(attrs={"class": "movies_small"}).findAll("a")
 			for episode in episodes:
 				episodeLink = episode.get("href")
@@ -151,6 +227,10 @@ class Season:
 		posterURL = self.posterURL
 
 		try:
+			if not self.soup:
+				seasonPage = requests.get(self.link).text
+				self.soup = BeautifulSoup(seasonPage, features="html.parser")
+
 			if not posterOnly:
 				name = self.soup.body.find(attrs={"itemprop": "name"})
 				if name:
@@ -173,21 +253,20 @@ class Episode:
 		self.title = title
 		self.posterURL = posterURL
 		self.rating = rating
+
+		self.soup = None
+
 		self.downloadLinksList = []
-
-		soup = None
-		try:
-			showPage = requests.get(self.link).text
-			soup = BeautifulSoup(showPage, features="html.parser")
-
-		finally:
-			self.soup = soup
 
 	def getDownloadSources(self):
 		try:
+			baseURL = self.link.split("/")[0] + "//" + self.link.split("/")[2]
+			
 			session = requests.Session()
 
-			baseURL = self.link.split("/")[0] + "//" + self.link.split("/")[2]
+			if not self.soup:
+				epispdePage = requests.get(self.link).text
+				self.soup = BeautifulSoup(epispdePage, features="html.parser")
 
 			episodeSoup = self.soup
 
@@ -248,6 +327,10 @@ class Episode:
 		posterURL = self.posterURL
 
 		try:
+			if not self.soup:
+				episodePage = requests.get(self.link).text
+				self.soup = BeautifulSoup(episodePage, features="html.parser")
+
 			if not posterOnly:
 				name = self.soup.body.find(attrs={"class": "movie_title"})
 				if name:
