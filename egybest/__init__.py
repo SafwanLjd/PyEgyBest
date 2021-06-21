@@ -315,7 +315,7 @@ class Episode:
 				qualityRegEx = "[0-9]{3,4}x[0-9]{3,4}"
 				quality = self.__roundQuality(int(re.search(qualityRegEx, qualityInfo)[0].split("x")[1]))
 				fileName = self.link.split("/")[4] + "-" + str(quality) + "p.mp4"
-				mediaLink = requests.utils.quote(qualityLinksArray[i+1]).replace("_", "%5F").replace("/stream/", "/dl/").replace("/stream.m3u8", f"/{fileName}")
+				mediaLink = requests.utils.quote(qualityLinksArray[i+1], safe=":/").replace("_", "%5F").replace("/stream/", "/dl/").replace("/stream.m3u8", f"/{fileName}")
 
 				self.downloadLinksList.append(DownloadSource(mediaLink, quality, fileName))
 
