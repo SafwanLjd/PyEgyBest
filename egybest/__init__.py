@@ -1,5 +1,5 @@
 from base64 import urlsafe_b64decode as decode
-from strsimpy.levenshtein import Levenshtein
+from strsimpy.ngram import NGram
 from js2py import eval_js as executeJS
 from bs4 import BeautifulSoup
 import requests
@@ -46,7 +46,7 @@ class EgyBest:
 					resultsList.append(Episode(link, title, posterURL, rating))
 			
 			if not originalOrder:
-				resultsList.sort(key=lambda element: Levenshtein().distance(query, element.title))
+				resultsList.sort(key=lambda element: NGram(1).distance(query, element.title))
 
 		finally:
 			return resultsList
@@ -312,12 +312,12 @@ class Episode:
 
 			for i in range(0, len(qualityLinksArray)-2, 2):
 				qualityInfo = qualityLinksArray[i]
-				link = qualityLinksArray[i+1].replace("/stream/", "/dl/")
 				qualityRegEx = "[0-9]{3,4}x[0-9]{3,4}"
 				quality = self.__roundQuality(int(re.search(qualityRegEx, qualityInfo)[0].split("x")[1]))
 				fileName = self.link.split("/")[4] + "-" + str(quality) + "p.mp4"
+				mediaLink = requests.utils.quote(qualityLinksArray[i+1]).replace("_", "%5F").replace("/stream/", "/dl/").replace("/stream.m3u8", f"/{fileName}")
 
-				self.downloadLinksList.append(DownloadSource(link, quality, fileName))
+				self.downloadLinksList.append(DownloadSource(mediaLink, quality, fileName))
 
 		finally:
 			return self.downloadLinksList
