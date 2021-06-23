@@ -9,7 +9,7 @@ import re
 
 class EgyBest:
 	def __init__(self, mirrorURL=None):
-		self.baseURL = mirrorURL if mirrorURL else "https://egy.best"
+		self.baseURL = mirrorURL or "https://egy.best"
 	
 	def search(self, query, includeShows=True, includeMovies=True, originalOrder=False):
 		searchURL = f"{self.baseURL}/explore/?q={query}%20"
@@ -32,13 +32,13 @@ class EgyBest:
 				link = result.get("href")
 				
 				titleClass = result.find(attrs={"class": "title"})
-				title = titleClass.text if titleClass else None
+				title = titleClass and titleClass.text
 
 				imgTag = result.find("img")
-				posterURL = imgTag.get("src") if imgTag else None
+				posterURL = imgTag and imgTag.get("src")
 				
 				ratingClass = result.find(attrs={"class": "i-fav rating"})
-				rating = ratingClass.text if ratingClass else None
+				rating = ratingClass and ratingClass.text
 
 				if link.split("/")[3] == "series" and includeShows:
 					resultsList.append(Show(link, title, posterURL, rating))
@@ -111,13 +111,13 @@ class EgyBest:
 				link = result.get("href")
 
 				titleClass = result.find(attrs={"class": "title"})
-				title = titleClass.text if titleClass else None
+				title = titleClass and titleClass.text
 
 				imgTag = result.find("img")
-				posterURL = imgTag.get("src") if imgTag else None
+				posterURL = imgTag and imgTag.get("src")
 
 				ratingClass = result.find(attrs={"class": "i-fav rating"})
-				rating = ratingClass.text if ratingClass else None
+				rating = ratingClass and ratingClass.text
 
 				topList.append(Episode(link, title, posterURL, rating) if listType == "movies" else Show(link, title, posterURL, rating))
 
@@ -147,10 +147,10 @@ class Show:
 				seasonLink = season.get("href")
 				
 				titleClass = season.find(attrs={"class": "title"})
-				seasonTitle = titleClass.text if titleClass else None
+				seasonTitle =  titleClass and titleClass.text
 				
 				imgTag = season.find("img")
-				seasonPosterURL = imgTag.get("src") if imgTag else None
+				seasonPosterURL = imgTag and imgTag.get("src")
 
 				self.seasonsList.insert(0, Season(seasonLink, seasonTitle, seasonPosterURL))
 
@@ -209,13 +209,13 @@ class Season:
 				episodeLink = episode.get("href")
 				
 				titleClass = episode.find(attrs={"class": "title"})
-				episodeTitle = titleClass.text if titleClass else None
+				episodeTitle = titleClass and titleClass.text
 				
 				imgTag = episode.find("img")
-				episodePosterURL = imgTag.get("src") if imgTag else None
+				episodePosterURL = imgTag and imgTag.get("src")
 				
 				ratingClass = episode.find(attrs={"class": "i-fav rating"})
-				episodeRating = ratingClass.text if ratingClass else None
+				episodeRating = ratingClass and ratingClass.text
 
 				self.episodesList.insert(0, Episode(episodeLink, episodeTitle, episodePosterURL, episodeRating))
 					
@@ -281,10 +281,11 @@ class Episode:
 			except AttributeError:
 				jsCode = str(videoSoup.find_all("script")[1])
 
-				verificationToken = str(re.findall("\{'[0-9a-zA-Z_]*':'ok'\}", jsCode)[0][2:-7])
+				verificationToken = re.findall("\{'[0-9a-zA-Z_]*':'ok'\}", jsCode)[0][2:-7]
 				encodedAdLinkVar = re.findall("\([0-9a-zA-Z_]{2,12}\[Math", jsCode)[0][1:-5]
-				firstEncodingArray = re.findall(",[0-9a-zA-Z_]{2,12}=\[\]", jsCode)[1][1:-3]
-				secondEncodingArray = re.findall(",[0-9a-zA-Z_]{2,12}=\[\]", jsCode)[2][1:-3]
+				encodingArraysRegEx = re.findall(",[0-9a-zA-Z_]{2,12}=\[\]", jsCode)
+				firstEncodingArray = encodingArraysRegEx[1][1:-3]
+				secondEncodingArray = encodingArraysRegEx[2][1:-3]
 
 				jsCode = re.sub("^<script type=\"text/javascript\">", "", jsCode)
 				jsCode = re.sub("[;,]\$\('\*'\)(.*)$", ";", jsCode)
