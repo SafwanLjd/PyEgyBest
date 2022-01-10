@@ -1,6 +1,6 @@
 # PyEgyBest
 
-This is a Selenium-less Python Library that allows you to interact with the EgyBest
+This is a Selenium-less Python Library that allows you to interact with EgyBest
 
 ## Installation
 
