@@ -6,13 +6,19 @@ import requests
 import math
 import re
 
-
+"""
+	somtimes episode List is order reversed, so
+	check the title of the first episode, 
+	if it includes the episode number you can reverse the order 
+	if the episode number is not 1
+"""
 class EgyBest:
 	def __init__(self, mirrorURL=None):
-		self.baseURL = mirrorURL or "https://egy.best"
+		self.baseURL = mirrorURL or "https://teka.egybest.to"
 	
 	def search(self, query, includeShows=True, includeMovies=True, originalOrder=False):
 		searchURL = f"{self.baseURL}/explore/?q={query}%20"
+        
 		searchResponse = None
 		resultsList = []
 		
@@ -40,11 +46,13 @@ class EgyBest:
 				ratingClass = result.find(attrs={"class": "i-fav rating"})
 				rating = ratingClass and ratingClass.text
 
-				if link.split("/")[3] == "series" and includeShows:
-					resultsList.append(Show(link, title, posterURL, rating))
-				elif link.split("/")[3] == "movie" and includeMovies:
-					resultsList.append(Episode(link, title, posterURL, rating))
-			
+				showType = link.split("/")[3]
+				
+				if showType in ("series", "anime") and includeShows:
+					resultsList.append(Show(link, title, posterURL, rating, showType))
+				elif showType == "movie" and includeMovies:
+					resultsList.append(Episode(link, title, posterURL, rating, showType))
+                
 			if not originalOrder:
 				resultsList.sort(key=lambda element: NGram(1).distance(query, element.title))
 
@@ -125,13 +133,14 @@ class EgyBest:
 			return topList
 
 
+
 class Show:
-	def __init__(self, link, title=None, posterURL=None, rating=None):
+	def __init__(self, link, title=None, posterURL=None, rating=None, movieType="Movie"):
 		self.link = link
 		self.title = title
 		self.posterURL = posterURL
 		self.rating = rating
-
+		self.type = movieType
 		self.soup = None
 
 		self.seasonsList = []
@@ -189,11 +198,11 @@ class Show:
 
 
 class Season:
-	def __init__(self, link, title=None, posterURL=None):
+	def __init__(self, link, title=None, posterURL=None, seasonType=None):
 		self.link = link
 		self.title = title
 		self.posterURL = posterURL
-		
+		self.type = seasonType
 		self.soup = None
 
 		self.episodesList = []
@@ -207,9 +216,8 @@ class Season:
 			episodes  = self.soup.body.find(attrs={"class": "movies_small"}).findAll("a")
 			for episode in episodes:
 				episodeLink = episode.get("href")
-				
-				titleClass = episode.find(attrs={"class": "title"})
-				episodeTitle = titleClass and titleClass.text
+
+				episodeTitle = episodeLink.split('/')[4] 
 				
 				imgTag = episode.find("img")
 				episodePosterURL = imgTag and imgTag.get("src")
@@ -248,12 +256,12 @@ class Season:
 
 
 class Episode:
-	def __init__(self, link, title=None, posterURL=None, rating=None):
+	def __init__(self, link, title=None, posterURL=None, rating=None, movieType=None):
 		self.link = link
 		self.title = title
 		self.posterURL = posterURL
 		self.rating = rating
-
+		self.type = movieType
 		self.soup = None
 
 		self.downloadLinksList = []
@@ -346,6 +354,7 @@ class Episode:
 		finally:
 			self.title = title
 			self.posterURL = posterURL
+			
 
 	def __roundQuality(self, originalQuality):
 		qualities = [2160, 1080, 720, 480, 360, 240]
