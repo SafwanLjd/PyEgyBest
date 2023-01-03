@@ -1,5 +1,7 @@
 # PyEgyBest
 
+**This Project Has Been Discontinued**
+
 This is a Selenium-less Python Library that allows you to interact with EgyBest
 
 ## Installation
